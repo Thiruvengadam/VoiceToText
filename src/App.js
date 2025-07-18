@@ -53,6 +53,8 @@ const App = () => {
   const [streamingText, setStreamingText] = useState("");
   const [messageHistory, setMessageHistory] = useState([]);
   const [blobActive, setBlobActive] = useState(false); // NEW
+  const [sessionId, setSessionId] = useState(null); // NEW: Store session ID
+  const sessionIdRef = useRef(null);
 
   const isRecordingRef = useRef(false);
   const ws = useRef(null);
@@ -67,6 +69,19 @@ const App = () => {
   const activeSources = useRef(new Set());
 
   const scaleValue = useRef(0);
+
+  const INACTIVITY_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+  let inactivityTimeout = null;
+
+  const resetInactivityTimeout = () => {
+    if (inactivityTimeout) clearTimeout(inactivityTimeout);
+    inactivityTimeout = setTimeout(() => {
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+        console.log("⏳ Inactivity timeout reached. Closing WebSocket.");
+        ws.current.close();
+      }
+    }, INACTIVITY_TIMEOUT_MS);
+  };
 
   const startHandsFreeLoop = async () => {
     console.log("🎙️ [startHandsFreeLoop] Initializing mic...");
@@ -144,16 +159,32 @@ const App = () => {
       const buffer = await blob.arrayBuffer();
       console.log("📦 [WebSocket] Sending audio blob:", buffer.byteLength);
 
-      ws.current = new WebSocket("ws://127.0.0.1:8000/ws/audio");
+      ws.current = new WebSocket("ws://127.0.0.1:8000/ws/voice");
 
       ws.current.onopen = () => {
         console.log("🌐 [WebSocket] Connected");
+      
+        if (sessionIdRef.current) {
+          console.log("🔑 [Session] Sending existing session ID from ref:", sessionIdRef.current);
+          ws.current.send(`__session__:${sessionIdRef.current}`);
+        }
+      
         ws.current.send(buffer);
         ws.current.send("__end__");
       };
-
+      
+      
       ws.current.onmessage = async (event) => {
+        resetInactivityTimeout();
         const msg = event.data;
+
+        // Handle session ID separately (independent of other message types)
+        if (msg.startsWith("__session__:")) {
+          const newSessionId = msg.replace("__session__:", "");
+          setSessionId(newSessionId);
+          sessionIdRef.current = newSessionId;  // keep ref in sync
+          console.log("🔑 [Session] Received session ID:", newSessionId);
+        }
 
         if (msg.startsWith("__stream__:")) {
           const token = msg.replace("__stream__:", "");
@@ -175,10 +206,17 @@ const App = () => {
           setBlobActive(true); // 🔊 TTS active → pulsate
 
           source.onended = () => {
-            console.log("✅ [TTS] Playback done. Closing WebSocket...");
+            console.log("✅ [TTS] Playback done.");
             activeSources.current.delete(source);
             setBlobActive(false); // 💤 idle after TTS
-            ws.current?.close();
+            // ws.current?.close(); // No longer close here
+
+            // Restart listening if still recording
+            if (isRecordingRef.current) {
+              setTimeout(() => {
+                startHandsFreeLoop();
+              }, 200); // small delay to avoid race conditions
+            }
           };
 
           source.start();
@@ -188,8 +226,14 @@ const App = () => {
 
       ws.current.onclose = () => {
         console.log("🔁 [WebSocket] Closed. Restarting mic...");
-        if (isRecordingRef.current) setTimeout(startHandsFreeLoop, 200);
+        if (isRecordingRef.current) {
+          setTimeout(() => {
+            // reconnect and resume with existing sessionId
+            startHandsFreeLoop();
+          }, 200);
+        }
       };
+      
 
       ws.current.onerror = (e) => {
         console.error("❌ [WebSocket] Error:", e);
@@ -210,6 +254,7 @@ const App = () => {
     activeSources.current.forEach(src => src.stop());
     activeSources.current.clear();
     cancelAnimationFrame(animationFrame.current);
+    if (inactivityTimeout) clearTimeout(inactivityTimeout);
   };
 
   const toggleRecording = () => {
