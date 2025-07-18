@@ -1,70 +1,82 @@
-# Getting Started with Create React App
+# Voice Assistant PWA
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A modern, hands-free, streaming voice assistant web app built with React, WebSockets, and 3D visualization.
 
-## Available Scripts
+## Features
+- **Hands-free voice interaction**: Speak to the assistant, get real-time streaming responses.
+- **Session management**: Maintains conversation context using session IDs.
+- **WebSocket communication**: Low-latency audio streaming to/from a Python backend.
+- **3D audio visualizer**: Animated Mercury-like blob visualizes mic activity and TTS playback.
+- **Timeout handling**: Automatically closes idle connections to save backend resources.
+- **TTS and STT**: Supports both text-to-speech and speech-to-text with streaming.
 
-In the project directory, you can run:
+## Prerequisites
+- **Node.js** (v16+ recommended)
+- **npm** or **yarn**
+- **Python backend** (see below)
 
-### `npm start`
+## Getting Started
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### 1. Clone the repository
+```bash
+git clone <your-repo-url>
+cd voice-assistant-pwa
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### 2. Install dependencies
+```bash
+npm install
+# or
+yarn install
+```
 
-### `npm test`
+### 3. Configure the development port (optional)
+To run the app on a custom port (default is 3000), create a `.env` file:
+```
+PORT=6000
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 4. Start the React app
+```bash
+npm start
+# or
+yarn start
+```
 
-### `npm run build`
+The app will be available at [http://localhost:3000](http://localhost:3000) (or your chosen port).
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### 5. Backend Setup
+- You need a Python backend with a WebSocket endpoint at `ws://localhost:8000/ws/voice`.
+- The backend should:
+  - Accept audio blobs (WAV, 16kHz, mono)
+  - Handle session IDs (sent as `__session__:<id>`)
+  - Stream responses (text, transcript, TTS audio as base64)
+- Example backend stack: FastAPI, Gemini, gTTS, or your own TTS/STT solution.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Usage
+- Click the microphone button to start/stop recording.
+- Speak your query; the assistant will transcribe, process, and respond with both text and audio.
+- The 3D blob animates to show activity.
+- The session is maintained as long as the tab is active and not idle for 2 minutes.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Configuration
+- **WebSocket URL**: Change in `src/App.js` if your backend runs elsewhere.
+- **Session Timeout**: Adjust `INACTIVITY_TIMEOUT_MS` in `src/App.js` as needed.
+- **Audio Sample Rate**: Ensure backend and frontend agree (default: 16kHz for input, 24kHz for output).
 
-### `npm run eject`
+## Troubleshooting
+- **No audio playback?**
+  - Check browser console for decoding errors.
+  - Ensure backend sends valid WAV/MP3 audio as base64.
+- **WebSocket disconnects?**
+  - Make sure backend is running and accessible at the correct port.
+  - Check for session ID handling in both frontend and backend.
+- **Mic not working?**
+  - Allow microphone access in your browser.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## License
+MIT
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+---
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+**Happy hacking!**

@@ -55,6 +55,12 @@ const App = () => {
   const [blobActive, setBlobActive] = useState(false); // NEW
   const [sessionId, setSessionId] = useState(null); // NEW: Store session ID
   const sessionIdRef = useRef(null);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatHistory, setChatHistory] = useState([]); // {role: 'user'|'assistant', content: string}
+  const [chatSessionId, setChatSessionId] = useState(null);
+  const chatSessionIdRef = useRef(null);
+  const chatInputRef = useRef(null);
 
   const isRecordingRef = useRef(false);
   const ws = useRef(null);
@@ -270,6 +276,49 @@ const App = () => {
     }
   };
 
+  // Chat with AI logic
+  const sendChatMessage = async () => {
+    if (!chatInput.trim()) return;
+    const prompt = chatInput.trim();
+    setChatHistory((prev) => [...prev, { role: "user", content: prompt }]);
+    setChatInput("");
+    try {
+      const res = await fetch("http://localhost:8000/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          session_id: chatSessionIdRef.current || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.session_id) {
+        setChatSessionId(data.session_id);
+        chatSessionIdRef.current = data.session_id;
+      }
+      if (data.response) {
+        setChatHistory((prev) => [...prev, { role: "assistant", content: data.response }]);
+      }
+    } catch (err) {
+      setChatHistory((prev) => [...prev, { role: "assistant", content: "[Error: Could not reach backend]" }]);
+    }
+  };
+
+  const endChat = () => {
+    setChatModalOpen(false);
+    setChatSessionId(null);
+    chatSessionIdRef.current = null;
+    setChatHistory([]);
+    setChatInput("");
+  };
+
+  // Focus chat input when modal opens
+  React.useEffect(() => {
+    if (chatModalOpen && chatInputRef.current) {
+      chatInputRef.current.focus();
+    }
+  }, [chatModalOpen]);
+
   return (
     <div
       style={{
@@ -286,18 +335,138 @@ const App = () => {
       <button
         style={{
           marginTop: 30,
-          padding: "12px 24px",
-          fontSize: "18px",
+          padding: "20px 40px",
+          fontSize: "24px",
           backgroundColor: "#1e3a8a",
           color: "white",
           border: "none",
-          borderRadius: "8px",
+          borderRadius: "12px",
           cursor: "pointer"
         }}
         onClick={toggleRecording}
       >
-        {isRecording ? <FaStop color="white" size={28} /> : <FaMicrophone color="red" size={28} />}
+        {isRecording ? <FaStop color="white" size={40} /> : <FaMicrophone color="red" size={40} />}
       </button>
+      <div style={{ color: '#fff', fontSize: '20px', fontWeight: 600, marginTop: 10, marginBottom: 10, letterSpacing: 1 }}>
+        Speak with AI
+      </div>
+
+      {/* Chat with AI button */}
+      <button
+        style={{
+          marginTop: 20,
+          padding: "18px 36px",
+          fontSize: "22px",
+          backgroundColor: "#4b5563",
+          color: "white",
+          border: "none",
+          borderRadius: "12px",
+          cursor: "pointer"
+        }}
+        onClick={() => setChatModalOpen(true)}
+      >
+        💬 Chat with AI
+      </button>
+
+      {/* Chat Modal */}
+      {chatModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000
+          }}
+        >
+          <div
+            style={{
+              background: "#22223b",
+              borderRadius: 16,
+              padding: "36px 36px 28px 36px",
+              minWidth: 480,
+              maxWidth: 700,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+              display: "flex",
+              flexDirection: "column",
+              maxHeight: "85vh",
+              position: "relative"
+            }}
+          >
+           {/* Close (X) button */}
+           <button
+             onClick={endChat}
+             style={{
+               position: "absolute",
+               top: 16,
+               right: 16,
+               background: "transparent",
+               border: "none",
+               color: "#fff",
+               fontSize: 28,
+               cursor: "pointer",
+               fontWeight: 700,
+               zIndex: 10
+             }}
+             aria-label="Close Chat"
+           >
+             ×
+           </button>
+            <h2 style={{ color: "#fff", marginBottom: 18, fontSize: 30 }}>AI Chat</h2>
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                background: "#282846",
+                borderRadius: 10,
+                padding: 18,
+                marginBottom: 18,
+                minHeight: 180,
+                maxHeight: 400
+              }}
+            >
+              {chatHistory.length === 0 && (
+               <div style={{ color: "#fff" }}>(Start the conversation...)</div>
+              )}
+              {chatHistory.map((msg, idx) => (
+               <div key={idx} style={{ marginBottom: 12, color: "#fff", fontSize: 18 }}>
+                 <b>{msg.role === "user" ? "You" : "AI"}:</b> {msg.content}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              <input
+                type="text"
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") sendChatMessage(); }}
+                style={{ flex: 1, padding: 14, borderRadius: 8, border: "1px solid #444", background: "#181826", color: "#fff", fontSize: 18 }}
+                placeholder="Type your message..."
+                disabled={!chatModalOpen}
+                ref={chatInputRef}
+              />
+              <button
+                onClick={sendChatMessage}
+               style={{ padding: "12px 28px", borderRadius: 8, background: "#2563eb", color: "#fff", border: "none", cursor: "pointer", fontSize: 18, fontWeight: 600 }}
+                disabled={!chatInput.trim()}
+              >
+                Send
+              </button>
+            </div>
+            <button
+              onClick={endChat}
+             style={{ marginTop: 20, background: "#ef4444", color: "#fff", border: "none", borderRadius: 8, padding: "12px 28px", cursor: "pointer", fontSize: 18, fontWeight: 600 }}
+            >
+              End Chat
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={{ color: "white", marginTop: 20, maxWidth: 500, textAlign: "center" }}>
         <h3>🎙️ Mic Transcript:</h3>
